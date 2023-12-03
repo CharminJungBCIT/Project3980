@@ -1,0 +1,284 @@
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAX_CLIENTS 10
+#define BUFFER_SIZE 1024
+#define UINT16_MAX 65535
+
+struct ClientInfo
+{
+    int client_socket;
+    int client_index;
+    int clients[MAX_CLIENTS];
+};
+
+const int    value    = 10;
+const int    valueNew = 5;
+static void *handle_client(void *arg);
+static void  start_server(char *address, uint16_t port);
+static void  start_client(char *address, uint16_t port);
+
+int main(int argc, char *argv[])
+{
+    if(argc != 4)
+    {
+        fprintf(stderr, "Usage: %s [-a/-c] <address> <port>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    if(strcmp(argv[1], "-a") == 0)
+    {
+        char    *endptr;
+        long int port_long = strtol(argv[3], &endptr, value);
+
+        // Check for conversion errors
+        if(*endptr != '\0' || port_long < 0 || port_long > UINT16_MAX)
+        {
+            fprintf(stderr, "Invalid port number: %s\n", argv[3]);
+            exit(EXIT_FAILURE);
+        }
+
+        start_server(argv[2], (uint16_t)port_long);
+    }
+    else if(strcmp(argv[1], "-c") == 0)
+    {
+        char    *endptr;
+        long int port_long = strtol(argv[3], &endptr, value);
+
+        // Check for conversion errors
+        if(*endptr != '\0' || port_long < 0 || port_long > UINT16_MAX)
+        {
+            fprintf(stderr, "Invalid port number: %s\n", argv[3]);
+            exit(EXIT_FAILURE);
+        }
+
+        start_client(argv[2], (uint16_t)port_long);
+    }
+    else
+    {
+        fprintf(stderr, "Invalid mode. Use -a for server or -c for client.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+void start_server(char *address, uint16_t port)
+{
+    int                server_socket;
+    int                client_socket;
+    int                max_sd;
+    int                activity;
+    struct sockaddr_in server_addr;
+    struct sockaddr_in client_addr;
+    int                clients[MAX_CLIENTS] = {0};
+
+    // Create socket
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if(server_socket == -1)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server_addr.sin_family      = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port        = htons(port);
+
+    // Bind
+    if(bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    {
+        perror("Bind failed");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen
+    if(listen(server_socket, valueNew) == -1)
+    {
+        perror("Listen failed");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Server listening on %s:%d\n", address, port);
+
+    while(1)
+    {
+        int                client_len = sizeof(client_addr);
+        struct ClientInfo *client_info;
+        pthread_t          tid;
+
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(server_socket, &readfds);
+        max_sd = server_socket;
+
+        for(int i = 0; i < MAX_CLIENTS; ++i)
+        {
+            if(clients[i] > 0)
+            {
+                FD_SET(clients[i], &readfds);
+                if(clients[i] > max_sd)
+                {
+                    max_sd = clients[i];
+                }
+            }
+        }
+
+        // Wait for activity on one of the sockets
+        activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
+
+        if(activity < 0)
+        {
+            perror("Select error");
+            close(server_socket);
+            exit(EXIT_FAILURE);
+        }
+
+        // New connection
+        if(FD_ISSET(server_socket, &readfds))
+        {
+            int client_index = -1;
+            for(int i = 0; i < MAX_CLIENTS; ++i)
+            {
+                if(clients[i] == 0)
+                {
+                    client_index = i;
+                    break;
+                }
+            }
+
+            if(client_index == -1)
+            {
+                fprintf(stderr, "Too many clients. Connection rejected.\n");
+                continue;
+            }
+
+            client_socket = accept(server_socket, (struct sockaddr *)&client_addr, (socklen_t *)&client_len);
+            if(client_socket == -1)
+            {
+                perror("Accept failed");
+                close(server_socket);
+                exit(EXIT_FAILURE);
+            }
+
+            printf("New connection from %s:%d, assigned to Client %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), client_index);
+
+            clients[client_index] = client_socket;
+
+            // Create a structure to hold client information
+            client_info = (struct ClientInfo *)malloc(sizeof(struct ClientInfo));
+            if(client_info == NULL)
+            {
+                perror("Memory allocation failed");
+                close(server_socket);
+                exit(EXIT_FAILURE);
+            }
+
+            client_info->client_socket = client_socket;
+            client_info->client_index  = client_index;
+            memcpy(client_info->clients, clients, sizeof(clients));
+
+            // Create a new thread to handle the client
+            if(pthread_create(&tid, NULL, handle_client, (void *)client_info) != 0)
+            {
+                perror("Thread creation failed");
+                close(server_socket);
+                free(client_info);
+                exit(EXIT_FAILURE);
+            }
+
+            // Detach the thread (we won't join it, allowing it to clean up resources on its own)
+            pthread_detach(tid);
+        }
+    }
+}
+
+void *handle_client(void *arg)
+{
+    struct ClientInfo *client_info   = (struct ClientInfo *)arg;
+    int                client_socket = client_info->client_socket;
+    int                client_index  = client_info->client_index;
+    int               *clients       = client_info->clients;
+
+    char    buffer[BUFFER_SIZE];
+    ssize_t bytes_received;
+
+    while(1)
+    {
+        bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        if(bytes_received <= 0)
+        {
+            printf("Client %d disconnected.\n", client_index);
+            close(client_socket);
+            clients[client_index] = 0;
+            free(client_info);
+            pthread_exit(NULL);
+        }
+
+        buffer[bytes_received] = '\0';
+        printf("Received from Client %d: %s", client_index, buffer);
+
+        // Broadcast the message to all other connected clients
+        for(int i = 0; i < MAX_CLIENTS; ++i)
+        {
+            if(clients[i] != 0 && i != client_index)
+            {
+                send(clients[i], buffer, strlen(buffer), 0);
+            }
+        }
+    }
+}
+
+void start_client(char *address, uint16_t port)
+{
+    int                client_socket;
+    struct sockaddr_in server_addr;
+    char               buffer[BUFFER_SIZE];
+
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if(client_socket == -1)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server_addr.sin_family      = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(address);
+    server_addr.sin_port        = htons(port);
+
+    // Connect to server
+    if(connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+    {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Connected to the server. Type your messages and press Enter to send. Press Ctrl-Z to exit.\n");
+
+    // Start a simple chat loop
+
+    while(1)
+    {
+        // Read from stdin
+        if(fgets(buffer, sizeof(buffer), stdin) == NULL)
+        {
+            perror("Error reading from stdin");
+            break;
+        }
+
+        // Send message to the server
+        if(send(client_socket, buffer, strlen(buffer), 0) == -1)
+        {
+            perror("Error sending message");
+            break;
+        }
+    }
+
+    close(client_socket);
+}
