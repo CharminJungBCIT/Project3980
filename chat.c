@@ -16,11 +16,12 @@ struct ClientInfo
     int clients[MAX_CLIENTS];
 };
 
-const int    value    = 10;
-const int    valueNew = 5;
+const int value    = 10;
+const int valueNew = 5;
+
 static void *handle_client(void *arg);
-static void  start_server(char *address, uint16_t port);
-static void  start_client(char *address, uint16_t port);
+static void  start_server(const char *address, uint16_t port);
+static void  start_client(const char *address, uint16_t port);
 
 int main(int argc, char *argv[])
 {
@@ -60,24 +61,21 @@ int main(int argc, char *argv[])
     }
     else
     {
-        fprintf(stderr, "Invalid mode. Use -a for server or -c for client.\n");
+        fprintf(stderr, "Invalid mode. Use -a for the server or -c for the client.\n");
         exit(EXIT_FAILURE);
     }
 
     return 0;
 }
 
-void start_server(char *address, uint16_t port)
+static void start_server(const char *address, uint16_t port)
 {
     int                server_socket;
     int                client_socket;
-    int                max_sd;
-    int                activity;
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     int                clients[MAX_CLIENTS] = {0};
 
-    // Create socket
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(server_socket == -1)
     {
@@ -109,14 +107,14 @@ void start_server(char *address, uint16_t port)
 
     while(1)
     {
-        int                client_len = sizeof(client_addr);
-        struct ClientInfo *client_info;
-        pthread_t          tid;
+        int       activity;
+        int       client_len = sizeof(client_addr);
+        pthread_t tid;
+        int       max_sd = server_socket;
 
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(server_socket, &readfds);
-        max_sd = server_socket;
 
         for(int i = 0; i < MAX_CLIENTS; ++i)
         {
@@ -142,8 +140,10 @@ void start_server(char *address, uint16_t port)
 
         // New connection
         if(FD_ISSET(server_socket, &readfds))
+
         {
-            int client_index = -1;
+            struct ClientInfo *client_info;
+            int                client_index = -1;
             for(int i = 0; i < MAX_CLIENTS; ++i)
             {
                 if(clients[i] == 0)
@@ -172,6 +172,7 @@ void start_server(char *address, uint16_t port)
             clients[client_index] = client_socket;
 
             // Create a structure to hold client information
+
             client_info = (struct ClientInfo *)malloc(sizeof(struct ClientInfo));
             if(client_info == NULL)
             {
@@ -201,17 +202,15 @@ void start_server(char *address, uint16_t port)
 
 void *handle_client(void *arg)
 {
+    char               buffer[BUFFER_SIZE];
     struct ClientInfo *client_info   = (struct ClientInfo *)arg;
     int                client_socket = client_info->client_socket;
     int                client_index  = client_info->client_index;
     int               *clients       = client_info->clients;
 
-    char    buffer[BUFFER_SIZE];
-    ssize_t bytes_received;
-
     while(1)
     {
-        bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if(bytes_received <= 0)
         {
             printf("Client %d disconnected.\n", client_index);
@@ -235,7 +234,7 @@ void *handle_client(void *arg)
     }
 }
 
-void start_client(char *address, uint16_t port)
+void start_client(const char *address, uint16_t port)
 {
     int                client_socket;
     struct sockaddr_in server_addr;
@@ -252,7 +251,7 @@ void start_client(char *address, uint16_t port)
     server_addr.sin_addr.s_addr = inet_addr(address);
     server_addr.sin_port        = htons(port);
 
-    // Connect to server
+    // Connect to the server
     if(connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
     {
         perror("Connection failed");
@@ -262,7 +261,6 @@ void start_client(char *address, uint16_t port)
     printf("Connected to the server. Type your messages and press Enter to send. Press Ctrl-Z to exit.\n");
 
     // Start a simple chat loop
-
     while(1)
     {
         // Read from stdin
