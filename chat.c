@@ -17,7 +17,7 @@ struct ClientInfo
 };
 
 const int value    = 10;
-const int valueNew = 5;
+const int valueNew = 20;
 
 static void *handle_client(void *arg);
 static void  start_server(const char *address, uint16_t port);
@@ -84,7 +84,7 @@ static void start_server(const char *address, uint16_t port)
     }
 
     server_addr.sin_family      = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_addr.s_addr = inet_addr(address);
     server_addr.sin_port        = htons(port);
 
     // Bind
