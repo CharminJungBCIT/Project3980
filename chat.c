@@ -115,6 +115,7 @@ static void start_server(const char *address, uint16_t port)
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(server_socket, &readfds);
+        FD_SET(STDIN_FILENO, &readfds);    // Add STDIN for server console input
 
         for(int i = 0; i < MAX_CLIENTS; ++i)
         {
@@ -140,7 +141,6 @@ static void start_server(const char *address, uint16_t port)
 
         // New connection
         if(FD_ISSET(server_socket, &readfds))
-
         {
             struct ClientInfo *client_info;
             int                client_index = -1;
@@ -197,6 +197,22 @@ static void start_server(const char *address, uint16_t port)
             // Detach the thread (we won't join it, allowing it to clean up resources on its own)
             pthread_detach(tid);
         }
+
+        // Check if there is input from the server's console
+        if(FD_ISSET(STDIN_FILENO, &readfds))
+        {
+            char server_buffer[BUFFER_SIZE];
+            fgets(server_buffer, sizeof(server_buffer), stdin);
+
+            // Broadcast the server's message to all connected clients
+            for(int i = 0; i < MAX_CLIENTS; ++i)
+            {
+                if(clients[i] != 0)
+                {
+                    send(clients[i], server_buffer, strlen(server_buffer), 0);
+                }
+            }
+        }
     }
 }
 
@@ -213,7 +229,7 @@ void *handle_client(void *arg)
         ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
         if(bytes_received <= 0)
         {
-            printf("Client %d disconnected.\n", client_index);
+            printf("Server closed the connection.\n");
             close(client_socket);
             clients[client_index] = 0;
             free(client_info);
@@ -238,7 +254,6 @@ void start_client(const char *address, uint16_t port)
 {
     int                client_socket;
     struct sockaddr_in server_addr;
-    char               buffer[BUFFER_SIZE];
 
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(client_socket == -1)
@@ -263,18 +278,50 @@ void start_client(const char *address, uint16_t port)
     // Start a simple chat loop
     while(1)
     {
-        // Read from stdin
-        if(fgets(buffer, sizeof(buffer), stdin) == NULL)
+        int    activity;
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(client_socket, &readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        // Wait for activity on the socket or user input
+
+        activity = select(client_socket + 1, &readfds, NULL, NULL, NULL);
+
+        if(activity < 0)
         {
-            perror("Error reading from stdin");
+            perror("Select error");
             break;
         }
 
-        // Send message to the server
-        if(send(client_socket, buffer, strlen(buffer), 0) == -1)
+        // Check if there is a message from the server or other clients
+        if(FD_ISSET(client_socket, &readfds))
         {
-            perror("Error sending message");
-            break;
+            char    server_buffer[BUFFER_SIZE];
+            ssize_t bytes_received = recv(client_socket, server_buffer, sizeof(server_buffer) - 1, 0);
+
+            if(bytes_received <= 0)
+            {
+                printf("Server closed the connection.\n");
+                break;
+            }
+
+            server_buffer[bytes_received] = '\0';
+            printf("Received: %s", server_buffer);
+        }
+
+        // Check if there is user input
+        if(FD_ISSET(STDIN_FILENO, &readfds))
+        {
+            char client_buffer[BUFFER_SIZE];
+            fgets(client_buffer, sizeof(client_buffer), stdin);
+
+            // Send user input to the server
+            if(send(client_socket, client_buffer, strlen(client_buffer), 0) == -1)
+            {
+                perror("Error sending message");
+                break;
+            }
         }
     }
 
