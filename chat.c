@@ -148,14 +148,14 @@ static void start_server(const char *address, uint16_t port)
 
         fd_set readfds;
         FD_ZERO(&readfds);
-        FD_SET(server_socket, &readfds);
-        FD_SET(STDIN_FILENO, &readfds);
+        FD_SET((long unsigned int)server_socket, &readfds);
+        FD_SET((long unsigned int)STDIN_FILENO, &readfds);
 
         for(int i = 0; i < MAX_CLIENTS; ++i)
         {
             if(clients[i] > 0)
             {
-                FD_SET(clients[i], &readfds);
+                FD_SET((long unsigned int)clients[i], &readfds);
                 if(clients[i] > max_sd)
                 {
                     max_sd = clients[i];
@@ -286,7 +286,7 @@ void start_client(const char *address, uint16_t port)
         int    activity;
         fd_set readfds;
         FD_ZERO(&readfds);
-        FD_SET(client_socket, &readfds);
+        FD_SET((long unsigned int)server_socket, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
         // Wait for activity on the socket or user input
