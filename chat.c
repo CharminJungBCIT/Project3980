@@ -16,8 +16,8 @@ struct ClientInfo
     int clients[MAX_CLIENTS];
 };
 
-static const  int value    = 10;
-static const  int valueNew = 20;
+static const int value    = 10;
+static const int valueNew = 20;
 
 static void *handle_client(void *arg);
 static void  start_server(const char *address, uint16_t port);
@@ -66,6 +66,40 @@ int main(int argc, char *argv[])
     }
 
     return 0;
+}
+
+void *handle_client(void *arg)
+{
+    char               buffer[BUFFER_SIZE];
+    struct ClientInfo *client_info   = (struct ClientInfo *)arg;
+    int                client_socket = client_info->client_socket;
+    int                client_index  = client_info->client_index;
+    int               *clients       = client_info->clients;
+
+    while(1)
+    {
+        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        if(bytes_received <= 0)
+        {
+            printf("Server closed the connection.\n");
+            close(client_socket);
+            clients[client_index] = 0;
+            free(client_info);
+            pthread_exit(NULL);
+        }
+
+        buffer[bytes_received] = '\0';
+        printf("Received from Client %d: %s", client_index, buffer);
+
+        // Broadcast the message to all other connected clients
+        for(int i = 0; i < MAX_CLIENTS; ++i)
+        {
+            if(clients[i] != 0 && i != client_index)
+            {
+                send(clients[i], buffer, strlen(buffer), 0);
+            }
+        }
+    }
 }
 
 static void start_server(const char *address, uint16_t port)
@@ -156,7 +190,8 @@ static void start_server(const char *address, uint16_t port)
             if(client_index == -1)
             {
                 fprintf(stderr, "Too many clients. Connection rejected.\n");
-                continue;
+                close(server_socket);    // Move close inside the loop
+                break;
             }
 
             client_socket = accept(server_socket, (struct sockaddr *)&client_addr, (socklen_t *)&client_len);
@@ -172,7 +207,6 @@ static void start_server(const char *address, uint16_t port)
             clients[client_index] = client_socket;
 
             // Create a structure to hold client information
-
             client_info = (struct ClientInfo *)malloc(sizeof(struct ClientInfo));
             if(client_info == NULL)
             {
@@ -213,42 +247,10 @@ static void start_server(const char *address, uint16_t port)
                 }
             }
         }
-        return ;
     }
-}
 
-void *handle_client(void *arg)
-{
-    char               buffer[BUFFER_SIZE];
-    struct ClientInfo *client_info   = (struct ClientInfo *)arg;
-    int                client_socket = client_info->client_socket;
-    int                client_index  = client_info->client_index;
-    int               *clients       = client_info->clients;
-
-    while(1)
-    {
-        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-        if(bytes_received <= 0)
-        {
-            printf("Server closed the connection.\n");
-            close(client_socket);
-            clients[client_index] = 0;
-            free(client_info);
-            pthread_exit(NULL);
-        }
-
-        buffer[bytes_received] = '\0';
-        printf("Received from Client %d: %s", client_index, buffer);
-
-        // Broadcast the message to all other connected clients
-        for(int i = 0; i < MAX_CLIENTS; ++i)
-        {
-            if(clients[i] != 0 && i != client_index)
-            {
-                send(clients[i], buffer, strlen(buffer), 0);
-            }
-        }
-    }
+    // Close the server socket when the loop exits
+    close(server_socket);
 }
 
 void start_client(const char *address, uint16_t port)
@@ -328,4 +330,3 @@ void start_client(const char *address, uint16_t port)
     // Close the client socket when the loop exits
     close(client_socket);
 }
-
