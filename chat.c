@@ -16,8 +16,8 @@ struct ClientInfo
     int clients[MAX_CLIENTS];
 };
 
-const int value    = 10;
-const int valueNew = 20;
+const static int value    = 10;
+const static int valueNew = 20;
 
 static void *handle_client(void *arg);
 static void  start_server(const char *address, uint16_t port);
