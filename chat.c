@@ -242,7 +242,7 @@ void start_client(const char *address, uint16_t port) {
   // Connect to the server
   if (connect(client_socket, (struct sockaddr *)&server_addr,
               sizeof(server_addr)) == -1) {
-    perror("Connection failed");
+    perror("\nConnection failed");
     exit(EXIT_FAILURE);
   }
 
@@ -272,7 +272,7 @@ void start_client(const char *address, uint16_t port) {
           recv(client_socket, server_buffer, sizeof(server_buffer) - 1, 0);
 
       if (bytes_received <= 0) {
-        printf("Server closed the connection.\n");
+        printf("\nServer closed the connection.\n");
         break;
       }
 
