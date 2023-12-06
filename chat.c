@@ -16,8 +16,8 @@ struct ClientInfo
     int clients[MAX_CLIENTS];
 };
 
-const static int value    = 10;
-const static int valueNew = 20;
+static const  int value    = 10;
+static const  int valueNew = 20;
 
 static void *handle_client(void *arg);
 static void  start_server(const char *address, uint16_t port);
@@ -213,6 +213,7 @@ static void start_server(const char *address, uint16_t port)
                 }
             }
         }
+        return ;
     }
 }
 
@@ -285,7 +286,6 @@ void start_client(const char *address, uint16_t port)
         FD_SET(STDIN_FILENO, &readfds);
 
         // Wait for activity on the socket or user input
-
         activity = select(client_socket + 1, &readfds, NULL, NULL, NULL);
 
         if(activity < 0)
@@ -325,5 +325,7 @@ void start_client(const char *address, uint16_t port)
         }
     }
 
+    // Close the client socket when the loop exits
     close(client_socket);
 }
+
