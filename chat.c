@@ -273,8 +273,8 @@ void start_client(const char *address, uint16_t port) {
     int activity;
     fd_set readfds;
     FD_ZERO(&readfds);
-    FD_SET(client_socket, &readfds);
-    FD_SET(STDIN_FILENO, &readfds);
+    FD_SET((long unsigned int)client_socket, &readfds);
+    FD_SET((long unsigned int)STDIN_FILENO, &readfds);
 
     // Wait for activity on the socket or user input
     activity = select(client_socket + 1, &readfds, NULL, NULL, NULL);
