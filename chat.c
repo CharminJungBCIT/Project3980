@@ -97,6 +97,7 @@ static void start_server(const char *address, uint16_t port) {
   struct sockaddr_in server_addr;
   struct sockaddr_in client_addr;
   int clients[MAX_CLIENTS] = {0};
+  int optval = 1;
 
   server_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
 
@@ -117,10 +118,10 @@ static void start_server(const char *address, uint16_t port) {
     exit(EXIT_FAILURE);
   }
 
-  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDDR, %optval, sizeof(optval)) == -1){
+  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1){
   perror("Setsockopt failed");
     close(server_socket);
-  exit(EXIT_FAILUR);
+  exit(EXIT_FAILURE);
     
   }
   
