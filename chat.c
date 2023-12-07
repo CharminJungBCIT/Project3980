@@ -99,7 +99,7 @@ static void start_server(const char *address, uint16_t port) {
   int clients[MAX_CLIENTS] = {0};
   int optval = 1;
 
-#ifdef
+#ifdef SOCK_CLOEXEC
   server_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
 #else
   server_socket = socket(AF_INET, SOCK_STREAM, 0); // NOLINT(android-cloexec-socket)
