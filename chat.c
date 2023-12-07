@@ -259,7 +259,7 @@ void start_client(const char *address, uint16_t port)
     int                client_socket;
     struct sockaddr_in server_addr;
 
-    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    client_socket = socket(AF_INET, SOCK_CLOEXEC, 0);
     if(client_socket == -1)
     {
         perror("Socket creation failed");
@@ -299,7 +299,7 @@ void start_client(const char *address, uint16_t port)
         }
 
         // Check if there is a message from the server or other clients
-        if(FD_ISSET(client_socket, &readfds))
+        if(FD_ISSET((long unsigned int)client_socket, &readfds))
         {
             char    server_buffer[BUFFER_SIZE];
             ssize_t bytes_received = recv(client_socket, server_buffer, sizeof(server_buffer) - 1, 0);
@@ -315,7 +315,7 @@ void start_client(const char *address, uint16_t port)
         }
 
         // Check if there is user input
-        if(FD_ISSET(STDIN_FILENO, &readfds))
+        if(FD_ISSET((long unsigned int)STDIN_FILENO, &readfds))
         {
             char client_buffer[BUFFER_SIZE];
             if(fgets(client_buffer, sizeof(client_buffer), stdin) == NULL)
