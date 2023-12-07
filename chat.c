@@ -117,6 +117,13 @@ static void start_server(const char *address, uint16_t port) {
     exit(EXIT_FAILURE);
   }
 
+  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDDR, %optval, sizeof(optval)) == -1){
+  perror("Setsockopt failed");
+    close(server_socket);
+  exit(EXIT_FAILUR);
+    
+  }
+  
   // Listen
   if (listen(server_socket, valueNew) == -1) {
     perror("Listen failed");
