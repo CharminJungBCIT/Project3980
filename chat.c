@@ -99,7 +99,11 @@ static void start_server(const char *address, uint16_t port) {
   int clients[MAX_CLIENTS] = {0};
   int optval = 1;
 
+#ifdef
   server_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#else
+  server_socket = socket(AF_INET, SOCK_STREAM, 0); // NOLINT(android-cloexec-socket)
+#endif
 
   if (server_socket == -1) {
     perror("Socket creation failed");
@@ -242,7 +246,12 @@ void start_client(const char *address, uint16_t port) {
   struct sockaddr_in server_addr;
   int flags;
 
+#ifdef SOCK_CLOEXEC
   client_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#else
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);    // NOLINT(android-cloexec-socket)
+#endif
+
   if (client_socket == -1) {
     perror("Socket creation failed");
     exit(EXIT_FAILURE);
