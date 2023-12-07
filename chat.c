@@ -1,12 +1,12 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <unistd.h>
 
 #define MAX_CLIENTS 10
 #define BUFFER_SIZE 1024
@@ -70,7 +70,7 @@ void *handle_client(void *arg) {
   int *clients = client_info->clients;
 
   while (1) {
-    ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+    ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
     if (bytes_received <= 0) {
       printf("Server closed the connection.\n");
       close(client_socket);
@@ -102,7 +102,8 @@ static void start_server(const char *address, uint16_t port) {
 #ifdef SOCK_CLOEXEC
   server_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
 #else
-  server_socket = socket(AF_INET, SOCK_STREAM, 0); // NOLINT(android-cloexec-socket)
+  server_socket =
+      socket(AF_INET, SOCK_STREAM, 0); // NOLINT(android-cloexec-socket)
 #endif
 
   if (server_socket == -1) {
@@ -122,13 +123,13 @@ static void start_server(const char *address, uint16_t port) {
     exit(EXIT_FAILURE);
   }
 
-  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1){
-  perror("Setsockopt failed");
+  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval,
+                 sizeof(optval)) == -1) {
+    perror("Setsockopt failed");
     close(server_socket);
-  exit(EXIT_FAILURE);
-    
+    exit(EXIT_FAILURE);
   }
-  
+
   // Listen
   if (listen(server_socket, valueNew) == -1) {
     perror("Listen failed");
@@ -249,7 +250,8 @@ void start_client(const char *address, uint16_t port) {
 #ifdef SOCK_CLOEXEC
   client_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
 #else
-    client_socket = socket(AF_INET, SOCK_STREAM, 0);    // NOLINT(android-cloexec-socket)
+  client_socket =
+      socket(AF_INET, SOCK_STREAM, 0); // NOLINT(android-cloexec-socket)
 #endif
 
   if (client_socket == -1) {
