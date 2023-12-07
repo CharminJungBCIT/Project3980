@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <netinetin.h>
+#include <netinet/in.h>
 
 #define MAX_CLIENTS 10
 #define BUFFER_SIZE 1024
@@ -98,7 +98,7 @@ static void start_server(const char *address, uint16_t port) {
   struct sockaddr_in client_addr;
   int clients[MAX_CLIENTS] = {0};
 
-  server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  server_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
 
   if (server_socket == -1) {
     perror("Socket creation failed");
@@ -234,7 +234,7 @@ void start_client(const char *address, uint16_t port) {
   struct sockaddr_in server_addr;
   int flags;
 
-  client_socket = socket(AF_INET, SOCK_STREAM, 0);
+  client_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
   if (client_socket == -1) {
     perror("Socket creation failed");
     exit(EXIT_FAILURE);
