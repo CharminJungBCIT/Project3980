@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinetin.h>
 
 #define MAX_CLIENTS 10
 #define BUFFER_SIZE 1024
@@ -132,12 +134,12 @@ static void start_server(const char *address, uint16_t port) {
 
     fd_set readfds;
     FD_ZERO(&readfds);
-    FD_SET(server_socket, &readfds);
-    FD_SET(STDIN_FILENO, &readfds);
+    FD_SET((long unsigned int)server_socket, &readfds);
+    FD_SET((long unsigned int)STDIN_FILENO, &readfds);
 
     for (int i = 0; i < MAX_CLIENTS; ++i) {
       if (clients[i] > 0) {
-        FD_SET(clients[i], &readfds);
+        FD_SET((long unsigned int)clients[i], &readfds);
         if (clients[i] > max_sd) {
           max_sd = clients[i];
         }
@@ -154,7 +156,7 @@ static void start_server(const char *address, uint16_t port) {
     }
 
     // New connection
-    if (FD_ISSET(server_socket, &readfds)) {
+    if (FD_ISSET((long unsigned int)server_socket, &readfds)) {
       struct ClientInfo *client_info;
       int client_index = -1;
       for (int i = 0; i < MAX_CLIENTS; ++i) {
@@ -210,7 +212,7 @@ static void start_server(const char *address, uint16_t port) {
     }
 
     // Check if there is input from the server's console
-    if (FD_ISSET(STDIN_FILENO, &readfds)) {
+    if (FD_ISSET((long unsigned int)STDIN_FILENO, &readfds)) {
       char server_buffer[BUFFER_SIZE];
       fgets(server_buffer, sizeof(server_buffer), stdin);
 
@@ -283,7 +285,7 @@ void start_client(const char *address, uint16_t port) {
     }
 
     // Check if there is a message from the server or other clients
-    if (FD_ISSET(client_socket, &readfds)) {
+    if (FD_ISSET((long unsigned int)client_socket, &readfds)) {
       char server_buffer[BUFFER_SIZE];
       ssize_t bytes_received =
           recv(client_socket, server_buffer, sizeof(server_buffer) - 1, 0);
@@ -298,7 +300,7 @@ void start_client(const char *address, uint16_t port) {
     }
 
     // Check if there is user input
-    if (FD_ISSET(STDIN_FILENO, &readfds)) {
+    if (FD_ISSET((long unsigned int)STDIN_FILENO, &readfds)) {
       char client_buffer[BUFFER_SIZE];
       if (fgets(client_buffer, sizeof(client_buffer), stdin) == NULL) {
         // Ctrl-D was pressed, causing EOF
